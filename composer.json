@@ -22,9 +22,6 @@
 		"typo3\/party": "~3.0",
 		"flowpack\/singlesignon-client": "dev-master"
 	},
-	"require-dev": {
-		"mockery/mockery": "0.7.*"
-	},
 	"autoload": {
 		"psr-0": {
 			"Flowpack\\SingleSignOn\\Server": "Classes"
