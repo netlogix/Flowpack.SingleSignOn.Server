@@ -9,6 +9,10 @@ namespace Flowpack\SingleSignOn\Server\Tests\Unit\Service;
 use \TYPO3\Flow\Http\Request;
 use \TYPO3\Flow\Http\Response;
 use \TYPO3\Flow\Http\Uri;
+use TYPO3\Flow\Object\ObjectManagerInterface;
+use TYPO3\Flow\Security\Account;
+use TYPO3\Party\Domain\Repository\PartyRepository;
+use TYPO3\Party\Domain\Service\PartyService;
 
 /**
  *
@@ -16,20 +20,38 @@ use \TYPO3\Flow\Http\Uri;
 class SimpleClientAccountMapperTest extends \TYPO3\Flow\Tests\UnitTestCase {
 
 	/**
+	 * Setup function
+	 */
+	public function setUp() {
+		$mockPartyService = $this->getMock(PartyService::class);
+		$mockObjectManager = $this->getMock(ObjectManagerInterface::class);
+		$mockObjectManager->expects($this->any())->method('isRegistered')->with('TYPO3\Party\Domain\Service\PartyService')->will($this->returnValue(TRUE));
+		$mockObjectManager->expects($this->any())->method('get')->will($this->returnCallback(function($objectName) use ($mockPartyService) {
+			switch ($objectName) {
+				case 'TYPO3\Party\Domain\Service\PartyService':
+					return $mockPartyService;
+					break;
+			}
+		}));
+		$this->account = new Account();
+		$this->inject($this->account, 'objectManager', $mockObjectManager);
+	}
+
+	/**
 	 * @test
 	 */
 	public function getAccountDataMapsAccountInformation() {
 		$ssoClient = new \Flowpack\SingleSignOn\Server\Domain\Model\SsoClient();
-		$account = new \TYPO3\Flow\Security\Account();
-		$account->setAccountIdentifier('jdoe');
-		$account->setRoles(array(new \TYPO3\Flow\Security\Policy\Role('Administrator')));
+		$this->account->setAccountIdentifier('jdoe');
+		$this->account->setRoles(array(new \TYPO3\Flow\Security\Policy\Role('Flowpack.SingleSignon:Administrator')));
 
 		$mapper = new \Flowpack\SingleSignOn\Server\Service\SimpleClientAccountMapper();
-		$data = $mapper->getAccountData($ssoClient, $account);
+		$this->inject($mapper, 'partyService', $this->getMock(PartyService::class));
+		$data = $mapper->getAccountData($ssoClient, $this->account);
 
 		$this->assertEquals(array(
 			'accountIdentifier' => 'jdoe',
-			'roles' => array('Administrator'),
+			'roles' => array('Flowpack.SingleSignon:Administrator'),
 			'party' => NULL
 		), $data);
 	}
@@ -39,16 +61,19 @@ class SimpleClientAccountMapperTest extends \TYPO3\Flow\Tests\UnitTestCase {
 	 */
 	public function getAccountDataMapsPublicPartyProperties() {
 		$ssoClient = new \Flowpack\SingleSignOn\Server\Domain\Model\SsoClient();
-		$account = new \TYPO3\Flow\Security\Account();
-		$account->setAccountIdentifier('jdoe');
-		$account->setRoles(array(new \TYPO3\Flow\Security\Policy\Role('Administrator')));
+		$this->account->setAccountIdentifier('jdoe');
+		$this->account->setRoles(array(new \TYPO3\Flow\Security\Policy\Role('Flowpack.SingleSignon:Administrator')));
 
 		$party = new \TYPO3\Party\Domain\Model\Person();
 		$party->setName(new \TYPO3\Party\Domain\Model\PersonName('', 'John', '', 'Doe'));
-		$account->setParty($party);
+		$this->account->setParty($party);
+
+		$mockPartyService = $this->getMock(PartyService::class);
+		$mockPartyService->expects($this->any())->method('getAssignedPartyOfAccount')->will($this->returnValue($party));
 
 		$mapper = new \Flowpack\SingleSignOn\Server\Service\SimpleClientAccountMapper();
-		$data = $mapper->getAccountData($ssoClient, $account);
+		$this->inject($mapper, 'partyService', $mockPartyService);
+		$data = $mapper->getAccountData($ssoClient, $this->account);
 
 		$this->assertArrayHasKey('party', $data);
 		$this->assertArrayHasKey('name', $data['party']);
@@ -61,19 +86,22 @@ class SimpleClientAccountMapperTest extends \TYPO3\Flow\Tests\UnitTestCase {
 	 */
 	public function getAccountDataExposesTypeIfConfigured() {
 		$ssoClient = new \Flowpack\SingleSignOn\Server\Domain\Model\SsoClient();
-		$account = new \TYPO3\Flow\Security\Account();
-		$account->setAccountIdentifier('jdoe');
-		$account->setRoles(array(new \TYPO3\Flow\Security\Policy\Role('Administrator')));
+		$this->account->setAccountIdentifier('jdoe');
+		$this->account->setRoles(array(new \TYPO3\Flow\Security\Policy\Role('Flowpack.SingleSignon:Administrator')));
 
 		$party = new \TYPO3\Party\Domain\Model\Person();
 		$party->setName(new \TYPO3\Party\Domain\Model\PersonName('', 'John', '', 'Doe'));
-		$account->setParty($party);
+		$this->account->setParty($party);
+
+		$mockPartyService = $this->getMock(PartyService::class);
+		$mockPartyService->expects($this->any())->method('getAssignedPartyOfAccount')->will($this->returnValue($party));
 
 		$mapper = new \Flowpack\SingleSignOn\Server\Service\SimpleClientAccountMapper();
+		$this->inject($mapper, 'partyService', $mockPartyService);
 		$mapper->setConfiguration(array(
 			'party' => array('_exposeType' => TRUE)
 		));
-		$data = $mapper->getAccountData($ssoClient, $account);
+		$data = $mapper->getAccountData($ssoClient, $this->account);
 
 		$this->assertArrayHasKey('party', $data);
 		$this->assertArrayHasKey('__type', $data['party']);

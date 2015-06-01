@@ -24,6 +24,12 @@ class SimpleClientAccountMapper implements ClientAccountMapperInterface {
 	protected $configuration = NULL;
 
 	/**
+	 * @var \TYPO3\Party\Domain\Service\PartyService
+	 * @Flow\Inject
+	 */
+	protected $partyService;
+
+	/**
 	 * Map the given account as account data for an instance
 	 *
 	 * @param \Flowpack\SingleSignOn\Server\Domain\Model\SsoClient $ssoClient
@@ -36,7 +42,7 @@ class SimpleClientAccountMapper implements ClientAccountMapperInterface {
 		} else {
 			$configuration = $this->getDefaultConfiguration($ssoClient, $account);
 		}
-		$partyData = $this->transformValue($account->getParty(), $configuration['party']);
+		$partyData = $this->transformValue($this->partyService->getAssignedPartyOfAccount($account), $configuration['party']);
 		$mappedRoles = array();
 		foreach ($account->getRoles() as $role) {
 			$mappedRoles[] = $role->getIdentifier();
@@ -126,7 +132,7 @@ class SimpleClientAccountMapper implements ClientAccountMapperInterface {
 	 * @return array
 	 */
 	protected function getDefaultConfiguration(\Flowpack\SingleSignOn\Server\Domain\Model\SsoClient $ssoClient, \TYPO3\Flow\Security\Account $account) {
-		if ($account->getParty() instanceof \TYPO3\Party\Domain\Model\Person) {
+		if ($this->partyService->getAssignedPartyOfAccount($account) instanceof \TYPO3\Party\Domain\Model\Person) {
 			return array(
 				'party' => array(
 					'_exposeType' => TRUE,
