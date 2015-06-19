@@ -87,7 +87,14 @@ class SsoClient {
 		$serviceUri = new Uri(rtrim($this->serviceBaseUri, '/') . '/session/' . urlencode($sessionId) . '/destroy');
 		$serviceUri->setQuery(http_build_query(array('serverIdentifier' => $ssoServer->getServiceBaseUri())));
 		$request = \TYPO3\Flow\Http\Request::create($serviceUri, 'DELETE');
-		$request->setContent('');
+
+		/**
+		 * Since current \TYPO3\Flow\Http\Client\CurlEngine just uses arguments
+		 * as request body in case the actual body is empty, we need to use a
+		 * fake body in order to not have curl corrupt.
+		 * @TODO: Somebody should fix CurlEngine instead.
+		 */
+		$request->setContent('@see https://jira.typo3.org/browse/FLOW-14');
 
 		return $this->requestSigner->signRequest($request, $ssoServer->getKeyPairFingerprint(), $ssoServer->getKeyPairFingerprint());
 	}
